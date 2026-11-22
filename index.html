@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SimLingo-Risk</title>
+<meta name="description" content="A read-only collision-risk monitor for the SimLingo vision–language–action driving model, tested in CARLA.">
+<meta property="og:title" content="SimLingo-Risk">
+<meta property="og:description" content="Building and testing a collision-risk monitor for a vision–language–action driving model.">
+<meta property="og:image" content="assets/img/poster.jpg">
+<style>
+  :root {
+    --bg: #ffffff; --fg: #15181d; --muted: #5b6573; --line: #e6e8ec;
+    --accent: #e8572a; --card: #f6f7f9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0e1116; --fg: #e9ecf1; --muted: #9aa4b2; --line: #232a33; --card: #161b22; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 56px 16px 64px; }
+  h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.1; margin: 0 0 12px; letter-spacing: -0.02em; text-align: center; }
+  .sub { text-align: center; color: var(--muted); font-size: 19px; margin: 0 0 20px; }
+  .authors { text-align: center; margin: 0; font-weight: 600; }
+  .aff { text-align: center; color: var(--muted); margin: 2px 0 24px; }
+  .buttons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 20px; border-radius: 999px;
+         text-decoration: none; font-weight: 600; border: 1px solid var(--line); color: var(--fg); background: var(--card); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn:hover { filter: brightness(1.05); }
+  .note { text-align: center; color: var(--muted); font-size: 15px; margin: 14px 0 36px; }
+  video, img { width: 100%; display: block; border-radius: 10px; }
+  .hero { box-shadow: 0 8px 30px rgba(0,0,0,.18); background: #000; }
+  section { margin-top: 56px; }
+  h2 { font-size: 24px; margin: 0 0 14px; letter-spacing: -0.01em; }
+  p.lead { font-size: 18px; margin: 0 0 18px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .stat b { display: block; font-size: 34px; line-height: 1.1; letter-spacing: -0.02em; }
+  .stat.warn b { color: var(--accent); }
+  .stat span { color: var(--muted); font-size: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  figure { margin: 0; }
+  figcaption { color: var(--muted); font-size: 14px; margin-top: 6px; }
+  .arch { background: #fff; padding: 12px; border: 1px solid var(--line); }
+  footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; text-align: center; }
+  footer a { color: inherit; }
+  @media (max-width: 720px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .grid { grid-template-columns: 1fr; }
+    main { padding-top: 36px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>SimLingo-Risk</h1>
+  <p class="sub">Building and testing a collision-risk monitor for a vision–language–action driving model</p>
+  <p class="authors">Layan Anabosi · Nawar Sgier · Elad Amrani</p>
+  <p class="aff">Technion – Israel Institute of Technology</p>
+  <div class="buttons">
+    <a class="btn primary" href="paper/SimLingo-Risk.pdf">Read Paper (PDF)</a>
+    <a class="btn" href="#video">Video</a>
+    <a class="btn" href="https://github.com/nawar21/SimLingoRisk-">GitHub</a>
+  </div>
+  <p class="note">Code will be released publicly.</p>
+
+  <video id="video" class="hero" controls preload="metadata" playsinline poster="assets/img/poster.jpg">
+    <source src="assets/video/simlingo-risk-demo.mp4" type="video/mp4">
+  </video>
+
+  <section>
+    <h2>Idea</h2>
+    <p class="lead">SimLingo drives from camera images and explains itself in words, but never says how dangerous a scene is.
+      We read its frozen hidden state with a small probe (264K parameters) and show a collision-hazard score and an uncertainty
+      live in CARLA. The monitor never changes how the car drives.</p>
+    <img class="arch" src="assets/img/architecture.jpg" alt="SimLingo architecture with the SimLingo-Risk probe attached to the backbone hidden state">
+  </section>
+
+  <section>
+    <h2>Results</h2>
+    <div class="stats">
+      <div class="stat"><b>0.960</b><span>AUROC on held-out frames</span></div>
+      <div class="stat"><b>0.748</b><span>on an unseen scenario type</span></div>
+      <div class="stat"><b>0.659</b><span>which live routes collide (216 routes)</span></div>
+      <div class="stat warn"><b>0.504</b><span>when the collision happens (chance)</span></div>
+    </div>
+    <p class="note" style="text-align:left;margin:14px 0 0">The score flags dangerous routes, not the moment of impact.</p>
+  </section>
+
+  <section>
+    <h2>Live in CARLA</h2>
+    <div class="grid">
+      <figure><video autoplay muted loop playsinline preload="metadata" src="assets/video/door.mp4"></video>
+        <figcaption>A door opens into traffic</figcaption></figure>
+      <figure><video autoplay muted loop playsinline preload="metadata" src="assets/video/parked-fog.mp4"></video>
+        <figcaption>Parked vehicle at night, in fog</figcaption></figure>
+      <figure><video autoplay muted loop playsinline preload="metadata" src="assets/video/pedestrians.mp4"></video>
+        <figcaption>Pedestrians crossing</figcaption></figure>
+      <figure><video autoplay muted loop playsinline preload="metadata" src="assets/video/left-turn.mp4"></video>
+        <figcaption>Left turn with a pedestrian</figcaption></figure>
+    </div>
+  </section>
+
+  <footer>
+    SimLingo-Risk · Technion · <a href="paper/SimLingo-Risk.pdf">Paper</a> ·
+    <a href="https://github.com/nawar21/SimLingoRisk-">GitHub</a><br>
+    Built on <a href="https://arxiv.org/abs/2503.09594">SimLingo</a> (Renz et al., CVPR 2025). Code will be released publicly.
+  </footer>
+</main>
+</body>
+</html>
