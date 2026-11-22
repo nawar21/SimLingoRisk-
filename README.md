@@ -2,7 +2,9 @@
 
 **Building and Testing a Collision-Risk Monitor for a Vision–Language–Action Driving Model**
 
-Layan Anabosi · Nawar Sgier · Elad Amrani — Technion – Israel Institute of Technology
+Layan Anabosi · Nawar Sgier — Advisor: Elad Amrani
+
+Henry and Marilyn Taub Faculty of Computer Science, Technion – Israel Institute of Technology
 
 [**Paper (PDF)**](paper/SimLingo-Risk.pdf) · [**Project page**](https://nawar21.github.io/SimLingoRisk-/) · [**Demo video**](assets/video/simlingo-risk-demo.mp4)
 
@@ -20,7 +22,8 @@ Layan Anabosi · Nawar Sgier · Elad Amrani — Technion – Israel Institute of
 
 | Test | Collision-hazard AUROC |
 |---|---|
-| Held-out frames (offline, 5 seeds) | 0.960 ± 0.001 |
+| Pilot: 5 held-out routes, one scenario type (549 frames) | 0.595 |
+| Held-out frames (offline, 117K-frame cache, 5 seeds) | 0.960 ± 0.001 |
 | Unseen scenario type (leave-one-scenario-out) | 0.748 ± 0.071 |
 | Live, which routes collide (216 Bench2Drive routes, mean score) | 0.659 [0.570, 0.743] |
 | Live, when the collision happens (16 collision routes) | 0.504 |
@@ -42,9 +45,9 @@ index.html                  project page (GitHub Pages)
 @misc{anabosi2026simlingorisk,
   title  = {SimLingo-Risk: Building and Testing a Collision-Risk Monitor
             for a Vision--Language--Action Driving Model},
-  author = {Anabosi, Layan and Sgier, Nawar and Amrani, Elad},
+  author = {Anabosi, Layan and Sgier, Nawar},
   year   = {2026},
-  note   = {Final project report, Technion -- Israel Institute of Technology}
+  note   = {Final project report, advisor Elad Amrani, Technion -- Israel Institute of Technology}
 }
 ```
 

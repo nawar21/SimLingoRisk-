@@ -21,8 +21,10 @@
 
 \title{SimLingo-Risk: Building and Testing a Collision-Risk Monitor for a Vision--Language--Action Driving Model}
 
-\author{\IEEEauthorblockN{Layan Anabosi, Nawar Sgier, Elad Amrani}
-\IEEEauthorblockA{Technion -- Israel Institute of Technology\\
+\author{\IEEEauthorblockN{Layan Anabosi and Nawar Sgier}
+\IEEEauthorblockA{Advisor: Elad Amrani\\
+Henry and Marilyn Taub Faculty of Computer Science\\
+Technion -- Israel Institute of Technology\\
 \{sgier.nawar, layananabosi\}@campus.technion.ac.il}}
 
 \maketitle
@@ -32,10 +34,12 @@ We built a read-only monitor that displays a collision-hazard score and an
 uncertainty estimate next to the outputs of SimLingo, a vision--language--action
 (VLA) driving model, in the CARLA simulator. The monitor is a probe with
 264K parameters that reads the last hidden state of the frozen model. No SimLingo
-weight is changed, and the monitor never affects control. We evaluated it first on
-recorded frames and then during simulated drives. On held-out frames, the hazard
-score reached an AUROC of 0.960 (mean of five seeds) with an expected calibration
-error of 0.014. When a whole scenario type was held out, the AUROC fell to 0.748.
+weight is changed, and the monitor never affects control. We evaluated it in
+stages. A pilot probe trained on 2{,}470 frames of one scenario type and tested on
+five held-out routes recovered distance and lane offset well ($R^2$ of 0.75 and
+0.72) but ranked the hazard flag only weakly (AUROC 0.595). The main probe, trained
+on 117{,}029 frames from seven scenario groups, reached a hazard AUROC of 0.960 on
+held-out frames (mean of five seeds) with an expected calibration error of 0.014. When a whole scenario type was held out, the AUROC fell to 0.748.
 Across 216 Bench2Drive routes driven with the monitor attached, the mean score over
 each route reached an AUROC of 0.659 for distinguishing routes that ended in a
 collision. Within the 16 collision routes we analyzed around the moment of impact,
@@ -85,9 +89,9 @@ that predicts the risk vector and an action uncertainty, trained with five seeds
 \item A live monitor inside the CARLA closed loop. SimLingo's driving code path does
 not produce the hidden state we trained on, so the monitor runs its own forward pass
 at every simulator tick (Sec.~\ref{sec:monitor}).
-\item An evaluation on held-out frames, on held-out scenario types, and on 216
-Bench2Drive routes at route and frame level. Two of the results are negative, and we
-report them.
+\item An evaluation in stages: a small pilot on held-out routes, a large held-out
+split of frames, held-out scenario types, and 216 Bench2Drive routes at route and
+frame level. Two of the results are negative, and we report them.
 \end{enumerate}
 
 % =====================================================================
@@ -193,7 +197,10 @@ not an impact. A frame is positive when the logged measurements mark a vehicle o
 pedestrian as a hazard. Physical contact is a separate and much rarer event, which
 we use only in the closed-loop evaluation (Sec.~\ref{sec:res-online}). Second, we
 regress inverse time-to-collision because TTC is unbounded when nothing is closing,
-and an unbounded target destabilizes the loss.
+and an unbounded target destabilizes the loss. For an actor 10\,m away closing at
+5\,m/s the label is 0.5\,s$^{-1}$. The label table also has a sixth column, the
+fractional excess over the speed limit, which only the pilot probe
+(Sec.~\ref{sec:res-pilot}) predicts.
 
 \subsection{Probe and training objective}
 
@@ -272,26 +279,48 @@ forward pass, so we make no real-time claim.
 
 \subsection{Data}
 
-All offline training uses SimLingo's existing driving logs. After features and labels
-are joined on route and frame, the cache holds 117{,}029 frames from 1{,}282 routes
-in seven scenario groups (Appendix, Table~\ref{tab:data}). The groups are uneven:
-noScenarios contributes 28{,}965 frames and VehicleTurning only 2{,}470 (2.1\%).
-We split the cache into training, validation and test sets with a test fraction of
-0.2. All offline numbers are reported on the test split; the validation split serves
-only as a cross-check. Consecutive frames of one drive are strongly correlated, so a
-held-out split of frames is an in-distribution test. Leave-one-scenario-out
-evaluation, which holds out every frame of one scenario group, is the stricter test.
-Labels are used only as targets, never as inputs.
+All offline training uses SimLingo's existing driving logs. Features and labels come
+from separate scripts: the extractor turns each camera frame, with its speed and
+navigation context, into a feature row, and a second script turns the matching
+CARLA measurements and object boxes into a label row. The trainer joins the two on a
+key made of the route path and the zero-padded frame number. Labels are used only as
+targets, never as inputs. We built two feature caches:
+\begin{itemize}
+\item a pilot cache of 2{,}470 frames from 26 routes, all VehicleTurning, used for
+A2 with a split that keeps routes disjoint (Sec.~\ref{sec:res-pilot});
+\item the full cache of 117{,}029 frames from 1{,}282 routes in seven scenario
+groups, used for A4 and every later experiment (Fig.~\ref{fig:scen}).
+\end{itemize}
 
-Hazard-positive frames are a minority (11.5\% of training frames and 2.0\% of
-validation frames in the pilot split of Appendix~\ref{app:pilot}), so we measure
-ranking with AUROC instead of accuracy.
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/scenario_frames.pdf}
+\caption{Frames per scenario group in the full cache. VehicleTurning (red), the
+group that later proves hardest to generalize to, is 2.1\% of the 117{,}029
+frames.}
+\label{fig:scen}
+\end{figure}
+
+We split the full cache into training, validation and test sets with a test
+fraction of 0.2. All A4 numbers are reported on the test split; the validation split
+serves only as a cross-check. Consecutive frames of one drive are strongly
+correlated, so a held-out split of frames is an in-distribution test.
+Leave-one-scenario-out evaluation, which holds out every frame of one scenario
+group, is the stricter test. Hazard-positive frames are a minority (11.5\% of
+training frames and 2.0\% of validation frames in the pilot), so we measure ranking
+with AUROC instead of accuracy.
+
+\emph{Provenance.} We recomputed the A2 numbers from the saved validation
+predictions. The A3, A4, A5, baseline, leave-one-scenario-out and closed-loop numbers
+are taken from the project's status report; the per-frame A3 residuals and A4
+prediction rows were not available for independent recalculation.
 
 \subsection{Experiments}
 
 Table~\ref{tab:exp} lists the completed experiments. A0 is SimLingo with nothing
-attached. A2 trains the risk head alone, A3 the uncertainty head alone, and A4 both
-jointly; A4 is the main model. A5 compares the action-mean head with and without
+attached. A2 is the pilot: the risk head alone, trained on the small cache. A3
+trains the uncertainty head alone, and A4 trains both jointly on the full cache;
+A4 is the main model. A2 and A4 use different caches and splits. A5 compares the action-mean head with and without
 $\hat{\mathbf{z}}$ as an input. A7 and A8 are generic uncertainty baselines on the
 same frozen $\mathbf{h}$. Two planned experiments were not run: A1, which would
 replace the structured $\mathbf{z}$ with an unstructured or random vector of the same
@@ -300,8 +329,9 @@ budget.
 
 \begin{table}[t]
 \centering
-\caption{Completed experiments. Offline results are on the held-out test split,
-mean over five seeds where available.}
+\caption{Completed experiments. A2 is evaluated on the five held-out pilot
+routes; other offline results are on the held-out test split of the full cache, mean
+over five seeds where available.}
 \label{tab:exp}
 \footnotesize
 \setlength{\tabcolsep}{3pt}
@@ -310,7 +340,7 @@ mean over five seeds where available.}
 ID & Configuration & Main result \\
 \midrule
 A0 & SimLingo, nothing attached & DS 88.99 \\
-A2 & Risk head only & Hazard AUROC $\approx$0.96 \\
+A2 & Risk head only, pilot cache & Hazard AUROC 0.595 \\
 A3 & Uncertainty head only & $\mathrm{corr}(\sighat,r)\approx0.80$ \\
 A4 & Joint risk + uncertainty (main) & AUROC 0.9596, ECE 0.0142 \\
 A5 & A4, action head with/without $\hat{\mathbf{z}}$ & No change in MSE \\
@@ -355,7 +385,70 @@ whether the score reacts around the impact. It does not test early warning.
 \section{Results}
 \label{sec:results}
 
-\subsection{Offline hazard ranking and calibration}
+\subsection{Pilot on held-out routes (A2)}
+\label{sec:res-pilot}
+
+The pilot probe predicted six outputs, the five of Table~\ref{tab:z} plus speed
+excess, with a slightly different trunk: $\mathrm{Linear}(896{\to}256)$, ReLU,
+dropout and LayerNorm, then $\mathrm{Linear}(256{\to}128)$ and GELU. It was trained
+on 21 routes of the pilot cache and tested on the other five (Table~\ref{tab:pilot}).
+
+Geometry came through clearly. On the held-out routes, $R^2$ was 0.753 for
+nearest-agent distance, 0.719 for lane offset and 0.413 for inverse TTC; speed excess
+was zero throughout this split, so its $R^2$ has no meaning. The mean absolute
+distance error over the 549 validation frames was 1.67\,m. Fig.~\ref{fig:route34}
+follows one held-out route. The distance prediction tracks the label closely. In the
+largest lane departure, the window starting at frame 135, the true mean offset is
+0.52\,m and the predicted mean 0.30\,m: the probe sees the departure but
+underestimates its size.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/pilot_route34_distance.png}\\[-1pt]
+{\footnotesize (a) Nearest-agent distance}\\[4pt]
+\includegraphics[width=\columnwidth]{figures/pilot_route34_lane.png}\\[-1pt]
+{\footnotesize (b) Lane offset}
+\caption{Pilot (A2) predictions against the simulator label on held-out route 34
+(156 frames). Each point averages up to 15 consecutive frames.}
+\label{fig:route34}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\caption{Pilot (A2): route-disjoint split and classification on the 549 validation
+frames. A random ranking has AUROC 0.5 and AP equal to the positive rate.}
+\label{tab:pilot}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}l c c c@{}}
+\toprule
+Split & Routes & Frames & Hazard-positive frames \\
+\midrule
+Training & 21 & 1{,}921 & 221 (11.5\%) \\
+Validation & 5 & 549 & 11 (2.0\%) \\
+\bottomrule
+\end{tabular}\\[6pt]
+\begin{tabular}{@{}l c c c c@{}}
+\toprule
+Target & Positives & Rate & AUROC & AP \\
+\midrule
+Occlusion ($\ge0.5$) & 28 & 5.1\% & 0.812 & 0.354 \\
+Collision hazard & 11 & 2.0\% & 0.595 & 0.060 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The hazard flag did not. Occlusion ranked well, but the hazard flag reached only
+AUROC 0.595 and average precision (AP) 0.060 (Table~\ref{tab:pilot}). As an alarm
+it failed: at a threshold of 0.50, all five alerts were false and all 11 positive
+frames were missed, and at 0.10 it raised 2 true and 9 false alerts. Ranked against
+a separate label, a Dreamer dynamic-crash flag derived from simulated action
+alternatives, the same predictions reached AUROC 0.542, so the hazard score agrees
+only weakly with this second crash outcome. Only two of the five validation routes
+contain a positive frame, so the hazard figures rest on 11 frames and are very
+uncertain.
+
+\subsection{Main probe: hazard ranking and calibration (A4)}
 \label{sec:res-offline}
 
 On the held-out test split, the A4 hazard head reached AUROC $0.9596\pm0.0010$ with
@@ -365,6 +458,13 @@ more between seeds, so we report its spread instead of a single value. The
 validation split gave nearly the same values. The deployed monitor uses seed~0,
 whose AUROC (0.9595) is closest to the mean; it is not the best seed. The
 uncertainty $\sighat$ correlated with the realized residual at $0.80$.
+
+The jump from the pilot (0.595) to A4 (0.960) is not an architecture effect alone:
+the two use different caches, splits, positive rates and evaluation units. The
+pilot's validation set holds 11 positives from two routes of the hardest scenario
+group, while A4's split is drawn from all seven groups. The comparison does show
+that the hazard flag needs much more, and more varied, data than scene geometry does
+before it can be read reliably.
 
 \begin{table}[t]
 \centering
@@ -416,7 +516,9 @@ Table~\ref{tab:r2}). Lane offset had the highest $R^2$ ($\approx0.87$), followed
 nearest-agent distance ($\approx0.80$). The occlusion proxy reached $\approx0.50$.
 Inverse TTC was the hardest ($\approx0.30$). A single frame shows how far away
 objects are more clearly than how fast they are approaching, and this label, derived
-from the nearest agent's relative motion, is also the noisiest.
+from the nearest agent's relative motion, is also the noisiest. In the pilot,
+inverse TTC reached 0.413 on a single scenario type, which may mean that the dynamics
+signal is specific to the scenario.
 
 \subsection{Calibrating the uncertainty}
 
@@ -447,9 +549,9 @@ AUROC averaged $0.748\pm0.071$ over the seven folds, about 0.21 lower (Appendix,
 Table~\ref{tab:loso}). The folds ranged from 0.848 (SignalizedJunctionRight) to
 0.628 (VehicleTurning). Distance transferred best (mean $R^2\approx0.61$). Lane
 offset was unstable, with negative $R^2$ on three folds, and inverse TTC did not
-transfer ($R^2\approx0$). An early pilot that held out five whole VehicleTurning
-routes gave a similar picture: hazard AUROC 0.595 on 549 frames with 11 positives
-(Appendix~\ref{app:pilot}).
+transfer ($R^2\approx0$). VehicleTurning, the weakest fold, is also the smallest
+group and the one the pilot was trained on; the pilot's held-out routes gave a
+similar picture (hazard AUROC 0.595, Sec.~\ref{sec:res-pilot}).
 
 \subsection{The monitor in closed loop}
 \label{sec:res-online}
@@ -538,7 +640,8 @@ is read-only by construction, and the one experiment that fed risk back into act
 prediction (A5) found no effect. Testing an intervention, such as an emergency-brake
 fallback on the riskiest frames measured by collisions avoided against intervention
 rate, is future work. The targets are simulator pseudo-labels that we defined, and
-the hazard flag we trained on is not the same event as a collision. The offline
+the hazard flag we trained on is not the same event as a collision; in the pilot it
+agreed only weakly with a separate Dreamer crash label (AUROC 0.542). The offline
 AUROC does not carry over to new scenario types (0.960 to 0.748, worst fold 0.628).
 Online, the route-level signal is modest, and the frame-level result is at chance;
 it was measured on 16 of the 46 collision routes, and its window tests the reaction
@@ -548,19 +651,32 @@ average precision (AUPRC) for the A4 probe, which would be more informative than
 AUROC at low prevalence. We also did not run the controls of A1, LoRA fine-tuning
 (A6), monitors built on SimLingo's own outputs (predicted speed, a time-to-collision
 from its waypoints, keywords in its commentary), a RiskMonitor-style
-probe~\cite{xiong2025riskmonitor}, or a privileged-state upper bound. Finally, the
-probe reads a single frame. The frame-level failure suggests that a temporal window
-over several consecutive hidden states is the first experiment to try.
+probe~\cite{xiong2025riskmonitor}, or a privileged-state upper bound. Several
+numbers come from the status report and could not be recomputed from per-frame
+predictions.
+
+\emph{Next step: an alert over time.} A route-level score can identify a difficult
+run after it ends; an operational alert must arrive before the event. We propose to
+(1) choose a threshold on validation routes and freeze it before the final
+evaluation, (2) time each alert by comparing the first threshold crossing with the
+first independently recorded event, and (3) report lead time, missed events and
+false alerts per kilometre on held-out routes. The current scores do not measure
+lead time. The probe also reads a single frame, and the frame-level failure suggests
+that a temporal window over several consecutive hidden states is the first change to
+try.
 
 \emph{Conclusion.} The last hidden state of a frozen SimLingo contains enough
-information for a 264K-parameter probe to rank hazard frames well offline (AUROC
-0.960) with nearly calibrated probabilities, and to estimate an uncertainty that
+information for a 264K-parameter probe to recover scene geometry, even from a small
+training set of one scenario type. Reading the hazard flag needed the full
+multi-scenario cache, where the probe ranked hazard frames well offline (AUROC
+0.960) with nearly calibrated probabilities and estimated an uncertainty that
 tracks the error of an action estimate read from the same state (correlation 0.80).
 Run live in CARLA without touching control, the same probe distinguished routes that
 ended in a collision from the others (AUROC 0.659), but it did not locate the moment
 of impact within a route (0.504). Feeding the risk back into action prediction did
-not help. SimLingo-Risk is useful as a route-level risk indicator. Using it to act,
-and making it sensitive to timing, are the next steps.
+not help. SimLingo-Risk is useful as a route-level risk indicator. The open question
+is timing: does the monitor warn early enough on a new route, at a false-alert rate
+an operator can accept?
 
 % =====================================================================
 \section*{Project Materials}
@@ -632,31 +748,6 @@ Neural Inf. Process. Syst. (NeurIPS) Datasets and Benchmarks Track}, 2024.
 \setcounter{table}{0}
 \setcounter{figure}{0}
 
-\subsection{Data by scenario group}
-
-\begin{table}[H]
-\centering
-\caption{Frames in the feature cache by scenario group (117{,}029 frames, 1{,}282
-routes).}
-\label{tab:data}
-\footnotesize
-\begin{tabular}{@{}l r r@{}}
-\toprule
-Scenario group & Frames & Share \\
-\midrule
-noScenarios & 28{,}965 & 24.8\% \\
-DynamicObjectCrossing & 23{,}403 & 20.0\% \\
-SignalizedJunctionRight & 17{,}834 & 15.2\% \\
-ControlLoss & 17{,}041 & 14.6\% \\
-SignalizedJunctionLeft & 15{,}694 & 13.4\% \\
-OppositeVehicleRunningRedLight & 11{,}622 & 9.9\% \\
-VehicleTurning & 2{,}470 & 2.1\% \\
-\midrule
-Total & 117{,}029 & 100\% \\
-\bottomrule
-\end{tabular}
-\end{table}
-
 \subsection{Per-coordinate recovery}
 
 \begin{table}[H]
@@ -721,37 +812,6 @@ OppositeVehicleRunningRedLight & 0.699 & 0.543 & 0.43 & $-0.02$ \\
 VehicleTurning & 0.628 & 0.652 & 0.66 & 0.01 \\
 \midrule
 Mean & $0.748\pm0.071$ & 0.61 & 0.12 & $-0.06$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Pilot experiment on held-out routes}
-\label{app:pilot}
-
-Before building the full cache, we trained an early version of the risk probe (A2) on
-a smaller cache of 2{,}470 VehicleTurning frames from 26 routes, with a split that
-kept routes disjoint (Table~\ref{tab:pilot}). This probe predicted six outputs,
-including a speed-excess target that was zero throughout this split, and used a
-slightly different trunk (ReLU, dropout and layer normalization). On the five
-validation routes it recovered geometry well ($R^2$ of 0.753 for distance, 0.719
-for lane offset and 0.413 for inverse TTC; mean absolute distance error 1.67\,m).
-Occlusion ranked well (AUROC 0.812, average precision 0.354 at 5.1\% prevalence).
-The hazard flag did not: AUROC 0.595 and average precision 0.060 at 2.0\%
-prevalence. Only two of the five validation routes contained a positive frame, so
-this hazard estimate rests on 11 frames and is very uncertain. It is consistent with
-the low VehicleTurning fold in Table~\ref{tab:loso}.
-
-\begin{table}[H]
-\centering
-\caption{Route-disjoint split of the pilot experiment.}
-\label{tab:pilot}
-\footnotesize
-\begin{tabular}{@{}l c c c@{}}
-\toprule
-Split & Routes & Frames & Hazard-positive frames \\
-\midrule
-Training & 21 & 1{,}921 & 221 (11.5\%) \\
-Validation & 5 & 549 & 11 (2.0\%) \\
 \bottomrule
 \end{tabular}
 \end{table}
